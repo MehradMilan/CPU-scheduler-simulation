@@ -3,8 +3,8 @@ import random
 import enum
 
 class CPU(simpy.Resource):
-    def __init__(self, waiting_queue, queue_list) -> None:
-        super().__init__()
+    def __init__(self, waiting_queue, queue_list, env) -> None:
+        super().__init__(env)
         self.waiting_queue = waiting_queue
         self.queue_list = queue_list
 
@@ -62,7 +62,7 @@ class Waiting_Queue:
         self.tasks.append(task)
 
     def sort_tasks(self):
-        self.tasks.sort(key= lambda x: x.priority.int * self.p + x.service_time * self.t)
+        self.tasks.sort(key= lambda x: x.priority.value * self.p + x.service_time * self.t)
 
     def dequeue(self, K):
         if self.tasks:
@@ -90,13 +90,17 @@ def job_creator(_lambda, _mu, priority_weights, waiting_queue: Priority_Queue, e
 
 def job_loader(sleep_time, K, waiting_queue: Waiting_Queue, queue_list, env: simpy.Environment):
     while True:
+        print("Waiting Queue: ", len(waiting_queue.tasks))
+        print("Queue List[0]: ", len(queue_list[0].tasks))
         t = 0
         for q in queue_list:
             t += q.length()
         if t < K:
             waiting_queue.sort_tasks()
             new_tasks = waiting_queue.dequeue(K)
-            queue_list[0].append(new_tasks)
+            if new_tasks:
+                for task in new_tasks:
+                    queue_list[0].enqueue(task)
         yield env.timeout(sleep_time)
 
 # env = simpy.Environment()
