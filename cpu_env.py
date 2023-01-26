@@ -19,16 +19,19 @@ class Task:
     def __init__(self, arrival_time, service_time, priority) -> None:
         self.priority = Task.Priority(priority)
         self.service_time = service_time
+        self.remaining_time = self.service_time
         self.arrival_time = arrival_time
+        self.is_finished = False
+        self.is_timeout = False
         self.pid = Task.pid
         Task.pid += 1
 
 class Priority_Queue:
 
     class Priority(enum.Enum):
-        FCFS = 0
+        FCFS = 2
         RR_T2 = 1
-        RR_T1 = 2
+        RR_T1 = 0
     
     def __init__(self, name, Q_time, priority) -> None:
         self.name = name
@@ -87,6 +90,7 @@ def job_creator(_lambda, _mu, priority_weights, waiting_queue: Priority_Queue, e
         service_time = int(random.expovariate(1/_mu))
         task = Task(arrival_time, service_time, priority)
         waiting_queue.enqueue(task)
+        print(str(env.now) + " " + "Task {} created".format(task.pid) + " Priority: " + str(task.priority) + " Arrival Time: " + str(task.arrival_time) + " Service Time: " + str(task.service_time))
 
 def job_loader(sleep_time, K, waiting_queue: Waiting_Queue, queue_list, env: simpy.Environment):
     while True:
@@ -99,14 +103,43 @@ def job_loader(sleep_time, K, waiting_queue: Waiting_Queue, queue_list, env: sim
             if new_tasks:
                 for task in new_tasks:
                     queue_list[0].enqueue(task)
+        print("Waiting Queue: " + str(waiting_queue.length()))
+        for q in queue_list:
+            print(q.name + ": " + str(q.length()))
         yield env.timeout(sleep_time)
 
 def choose_queue(queue_list):
     for q in queue_list:
         if q.length() > 0:
             return q
-    return None
+        return None
 
-# env = simpy.Environment()
-# env.process(job_creator(1, 2, [0.7, 0.2, 0.1], Priority_Queue(), env))
-# env.run(until = 50)
+def dispatcher(env, cpu: CPU):
+    i = 0
+    while i < 50:
+        i += 1
+        with cpu.request() as req:
+            yield req
+            queue = choose_queue(cpu.queue_list)
+            if queue:
+                task = queue.dequeue()
+                print("Task {} started".format(task.pid))
+                if queue.Q_time:
+                    spend_time = min(task.remaining_time, queue.Q_time)
+                    yield env.timeout(spend_time)
+                    task.remaining_time -= spend_time
+                    if task.remaining_time > 0:
+                        cpu.queue_list[queue.priority.value + 1].enqueue(task)
+                    else:
+                        task.is_finished = True
+                        print("Task {} finished".format(task.pid))
+                else:
+                    yield env.timeout(task.remaining_time)
+                    task.remaining_time = 0
+                    task.is_finished = True
+                    print("Task {} finished".format(task.pid))
+        print("CPU is idle" + str(i) + " " + str(env.now))   
+        yield env.timeout(1) 
+    # env = simpy.Environment()
+    # env.process(job_creator(1, 2, [0.7, 0.2, 0.1], Priority_Queue(), env))
+    # env.run(until = 50)
