@@ -29,9 +29,9 @@ class Task:
 class Priority_Queue:
 
     class Priority(enum.Enum):
-        FCFS = 2
-        RR_T2 = 1
         RR_T1 = 0
+        RR_T2 = 1
+        FCFS = 2
     
     def __init__(self, name, Q_time, priority) -> None:
         self.name = name
@@ -103,9 +103,9 @@ def job_loader(sleep_time, K, waiting_queue: Waiting_Queue, queue_list, env: sim
             if new_tasks:
                 for task in new_tasks:
                     queue_list[0].enqueue(task)
-        print("Waiting Queue: " + str(waiting_queue.length()))
-        for q in queue_list:
-            print(q.name + ": " + str(q.length()))
+            print(str(env.now) + " " + "Job loading..." + " " + "Waiting Queue: " + str(waiting_queue.length()))
+            for q in queue_list:
+                print(q.name + ": " + str(q.length()))
         yield env.timeout(sleep_time)
 
 def choose_queue(queue_list):
@@ -115,30 +115,32 @@ def choose_queue(queue_list):
         return None
 
 def dispatcher(env, cpu: CPU):
-    i = 0
-    while i < 50:
-        i += 1
+    while True:
         with cpu.request() as req:
             yield req
             queue = choose_queue(cpu.queue_list)
             if queue:
                 task = queue.dequeue()
-                print("Task {} started".format(task.pid))
+                print(str(env.now) + " " + "Task {} started".format(task.pid))
                 if queue.Q_time:
                     spend_time = min(task.remaining_time, queue.Q_time)
                     yield env.timeout(spend_time)
                     task.remaining_time -= spend_time
                     if task.remaining_time > 0:
+                        print(str(env.now) + " " + queue.name)
+                        print(len(cpu.queue_list))
+                        print(queue.priority.value)
                         cpu.queue_list[queue.priority.value + 1].enqueue(task)
                     else:
                         task.is_finished = True
-                        print("Task {} finished".format(task.pid))
+                        print(str(env.now) + " " + "Task {} finished".format(task.pid))
                 else:
                     yield env.timeout(task.remaining_time)
                     task.remaining_time = 0
                     task.is_finished = True
-                    print("Task {} finished".format(task.pid))
-        print("CPU is idle" + str(i) + " " + str(env.now))   
+                    print(str(env.now) + " " + "Task {} finished".format(task.pid))
+            else:
+                print(str(env.now) + " " + "CPU is idle")   
         yield env.timeout(1) 
     # env = simpy.Environment()
     # env.process(job_creator(1, 2, [0.7, 0.2, 0.1], Priority_Queue(), env))
