@@ -9,7 +9,7 @@ class CPU(simpy.Resource):
         self.queue_list = queue_list
 
 class Task:
-    pid = 0
+    pid = 1
     all_tasks = []
 
     class Priority(enum.Enum):
@@ -29,6 +29,22 @@ class Task:
         self.pid = Task.pid
         Task.pid += 1
         Task.all_tasks.append(self)
+        self.ss = None
+        self.current_queue = None
+
+    def start_starving(self, env):
+        try:
+            yield env.timeout(self.max_timeout)
+            self.throw_out()
+            print(str(env.now) + " Task " + str(self.pid) + " is timeout")
+            self.ss = None
+        except simpy.Interrupt:
+            self.ss = None
+
+    def throw_out(self):
+        self.is_timeout = True
+        self.current_queue.remove(self)
+        self.current_queue = None
     
     def init_spend_times(self):
         self.spend_times = {}
@@ -70,12 +86,16 @@ class Priority_Queue:
 
     def enqueue(self, task):
         self.tasks.append(task)
+        task.current_queue = self
 
     def dequeue(self) -> Task:
         if self.tasks:
             return self.tasks.pop(0)
         else:
             return None
+
+    def remove(self, task):
+        self.tasks.remove(task)
 
     def length(self):
         return len(self.tasks)
@@ -90,6 +110,7 @@ class Waiting_Queue:
 
     def enqueue(self, task):
         self.tasks.append(task)
+        task.current_queue = self
 
     def sort_tasks(self):
         self.tasks.sort(key= lambda x: x.priority.value * self.p + x.service_time * self.t)
@@ -104,6 +125,9 @@ class Waiting_Queue:
         else:
             return None
 
+    def remove(self, task):
+        self.tasks.remove(task)
+
     def length(self):
         return len(self.tasks)
 
@@ -117,8 +141,9 @@ def job_creator(_lambda, _mu, Z, priority_weights, waiting_queue: Priority_Queue
         max_timeout = int(random.expovariate(1/Z))
         task = Task(arrival_time, service_time, max_timeout, priority)
         task.update_queue_enter_time(waiting_queue.name, env.now)
+        task.ss = env.process(task.start_starving(env))
         waiting_queue.enqueue(task)
-        print(str(env.now) + " " + "Task {} created".format(task.pid) + " Priority: " + str(task.priority) + " Arrival Time: " + str(task.arrival_time) + " Service Time: " + str(task.service_time))
+        print(str(env.now) + " " + "Task {} created".format(task.pid) + " Priority: " + str(task.priority) + " Arrival Time: " + str(task.arrival_time) + " Service Time: " + str(task.service_time) + " Max Timeout: " + str(task.max_timeout))
 
 def job_loader(sleep_time, K, waiting_queue: Waiting_Queue, queue_list, env: simpy.Environment):
     while True:
@@ -152,12 +177,20 @@ def choose_queue(queue_list, weights) -> Priority_Queue:
 
 def dispatcher(queue_choose_weights, cpu: CPU, env: simpy.Environment):
     while True:
+        yield env.timeout(1)
         with cpu.request() as req:
             yield req
             queue = choose_queue(cpu.queue_list, queue_choose_weights)
             if queue:
                 print(str(env.now) + " " + "Dispatcher choose queue: " + queue.name)
-                task = queue.dequeue()
+                task = None
+                while not task:
+                    task = queue.dequeue()
+                    if task.ss:
+                        task.ss.interrupt()
+                    # if task.is_timeout:
+                    #     print(str(env.now) + " " + "Task {} passed ****************".format(task.pid))
+                    #     task = None
                 task.update_queue_exit_time(queue.priority.name, env.now)
                 print(str(env.now) + " " + "Task {} started".format(task.pid))
                 if queue.Q_time:
@@ -176,5 +209,4 @@ def dispatcher(queue_choose_weights, cpu: CPU, env: simpy.Environment):
                     task.is_finished = True
                     print(str(env.now) + " " + "Task {} finished".format(task.pid))
             else:
-                print(str(env.now) + " " + "CPU is idle")   
-        yield env.timeout(1)
+                print(str(env.now) + " " + "CPU is idle")
