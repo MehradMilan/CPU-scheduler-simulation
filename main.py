@@ -10,3 +10,4 @@ env.process(cpu_env.dispatcher([0.8, 0.1, 0.1], cpu, env))
 env.run(until = 50)
 for t in cpu_env.Task.all_tasks:
     print(str(t))
+print(cpu.idle_time)

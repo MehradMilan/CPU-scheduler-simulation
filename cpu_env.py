@@ -7,6 +7,7 @@ class CPU(simpy.Resource):
         super().__init__(env)
         self.waiting_queue = waiting_queue
         self.queue_list = queue_list
+        self.idle_time = 0
 
 class Task:
     pid = 1
@@ -214,4 +215,5 @@ def dispatcher(queue_choose_weights, cpu: CPU, env: simpy.Environment):
                     task.is_finished = True
                     print(str(env.now) + " " + "Task {} finished".format(task.pid))
             else:
+                cpu.idle_time += 1
                 print(str(env.now) + " " + "CPU is idle")
