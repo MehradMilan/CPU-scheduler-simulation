@@ -32,6 +32,9 @@ class Task:
         self.ss = None
         self.current_queue = None
 
+    def __str__(self) -> str:
+        return "Task " + str(self.pid) + " " + str(self.spend_times) + " " + str(self.is_timeout) + " " + str(self.is_finished)
+
     def start_starving(self, env):
         try:
             yield env.timeout(self.max_timeout)
@@ -131,8 +134,9 @@ class Waiting_Queue:
     def length(self):
         return len(self.tasks)
 
-def job_creator(_lambda, _mu, Z, priority_weights, waiting_queue: Priority_Queue, env: simpy.Environment):
-    while True:
+def job_creator(_lambda, _mu, Z, priority_weights, cp, waiting_queue: Priority_Queue, env: simpy.Environment):
+    i = 0
+    while i < cp:
         priority = random.choices(([p.value for p in Task.Priority]), weights=priority_weights, k=1)[0]
         pending_time = int(random.expovariate(_lambda))
         yield env.timeout(pending_time)
@@ -144,6 +148,7 @@ def job_creator(_lambda, _mu, Z, priority_weights, waiting_queue: Priority_Queue
         task.ss = env.process(task.start_starving(env))
         waiting_queue.enqueue(task)
         print(str(env.now) + " " + "Task {} created".format(task.pid) + " Priority: " + str(task.priority) + " Arrival Time: " + str(task.arrival_time) + " Service Time: " + str(task.service_time) + " Max Timeout: " + str(task.max_timeout))
+        i += 1
 
 def job_loader(sleep_time, K, waiting_queue: Waiting_Queue, queue_list, env: simpy.Environment):
     while True:
