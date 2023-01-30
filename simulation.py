@@ -29,7 +29,20 @@ def run_simulation(X, Y, Z, job_count, simulation_time):
         print(q.name + ' mean length:')
         print(queue_length_mean(q, simulation_time))
 
+    print('Waiting queue mean time spent in queue:')
+    print(time_spent_in_queue(cpu.waiting_queue, Task.all_tasks))
+    for q in cpu.queue_list:
+        print(q.name + ' mean time spent in queue:')
+        print(time_spent_in_queue(q, Task.all_tasks))
+
+    print('CPU idle time:')
     print(cpu.idle_time)
+
+    print('CPU utilization:')
+    print(cpu_utilization(cpu, simulation_time))
+
+    print('Timeout task percent:')
+    print(timeout_task_percent(Task.all_tasks))
 
 
 def queue_length_mean(queue, simulation_time):
@@ -39,3 +52,17 @@ def queue_length_mean(queue, simulation_time):
         if tq > 0:
             qlm += tq
     return qlm / simulation_time
+
+def time_spent_in_queue(queue, task):
+    tsiq = 0
+    for t in Task.all_tasks:
+        tq = t.spend_times[queue.name][1] - t.spend_times[queue.name][0]
+        if tq > 0:
+            tsiq += tq
+    return tsiq / len(Task.all_tasks)
+
+def cpu_utilization(cpu, simulation_time):
+    return (simulation_time - cpu.idle_time) / simulation_time
+
+def timeout_task_percent(tasks):
+    return len([t for t in tasks if t.is_timeout]) / len(tasks)
