@@ -4,8 +4,8 @@ import simpy
 class Priority_Queue:
 
     class Priority(enum.Enum):
-        RR_T1 = 0
-        RR_T2 = 1
+        Round_Robin_T1 = 0
+        Round_Robin_T2 = 1
         FCFS = 2
     
     def __init__(self, name, Q_time, priority) -> None:
@@ -91,14 +91,15 @@ class Task:
     def start_starving(self, env):
         try:
             yield env.timeout(self.max_timeout)
-            self.throw_out()
-            print(str(env.now) + " Task " + str(self.pid) + " is timeout")
+            print(str(env.now) + " Task " + str(self.pid) + " is timeout" + " from " + self.current_queue.name)
+            self.throw_out(env.now)
             self.ss = None
         except simpy.Interrupt:
             self.ss = None
 
-    def throw_out(self):
+    def throw_out(self, now):
         self.is_timeout = True
+        self.update_queue_exit_time(self.current_queue.name, now)
         self.current_queue.remove(self)
         self.current_queue = None
     
